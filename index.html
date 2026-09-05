@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1826">
+<title>HM-10 · Control de Vehículo BLE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b1826;
+    --bg-soft: radial-gradient(ellipse 900px 500px at 50% -10%, #16283f 0%, #0b1826 60%);
+    --panel: #12233a;
+    --panel-alt: #17293f;
+    --border: #223349;
+    --border-soft: #1b2c42;
+    --text: #eef1f6;
+    --text-dim: #93a2b8;
+    --text-faint: #5f7086;
+    --amber: #e8b64a;
+    --amber-dim: #b5893a;
+    --teal: #4fd6b5;
+    --red: #ff6f59;
+    --radius: 14px;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  [data-theme="light"]{
+    --bg: #eef2f7;
+    --bg-soft: radial-gradient(ellipse 900px 500px at 50% -10%, #ffffff 0%, #eef2f7 60%);
+    --panel: #ffffff;
+    --panel-alt: #f2f5f9;
+    --border: #d7dee6;
+    --border-soft: #e3e8ee;
+    --text: #16283f;
+    --text-dim: #55647a;
+    --text-faint: #8492a6;
+    --amber: #a9760f;
+    --amber-dim: #8a6110;
+    --teal: #158f78;
+    --red: #d94a34;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg-soft), var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    padding: 28px 16px 60px;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .wrap{
+    max-width: 480px; margin: 0 auto;
+    animation: glitchJitter 9s steps(1) infinite;
+    filter: saturate(.6);
+  }
+
+  .brand-bar{
+    height: 3px; border-radius: 2px; margin-bottom: 20px;
+    background: linear-gradient(90deg, var(--amber) 0%, var(--red) 100%);
+  }
+
+  /* ---------- Header ---------- */
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--amber);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eyebrow::before{
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+  }
+  h1{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.15;
+    margin: 10px 0 6px;
+    letter-spacing: -0.01em;
+    text-shadow: -1px 0 rgba(255,90,90,.3), 1px 0 rgba(90,190,255,.28);
+  }
+  .sub{ color: var(--text-dim); font-size: 14px; line-height: 1.5; margin: 0 0 26px; }
+
+  .header-row{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .header-actions{ display:flex; gap:8px; flex:0 0 auto; }
+  .icon-btn{
+    flex: 0 0 auto; width: 40px; height: 40px; margin-top: 2px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel-alt); color: var(--text);
+    font-size: 17px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .08s ease, background .15s ease;
+  }
+  .icon-btn:active{ transform: scale(0.93); }
+  .icon-btn:focus-visible{ outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  .settings-wrap{ position: relative; }
+  .settings-panel{
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
+    width: 220px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  }
+  .settings-panel label{
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px;
+  }
+  .settings-panel input[type="range"]{
+    width: 100%; margin: 0 0 14px; accent-color: var(--amber);
+  }
+  .settings-panel input[type="range"]:last-of-type{ margin-bottom: 0; }
+
+  /* ---------- Card ---------- */
+  .card{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  /* ---------- Ventanas estilo Windows XP (solo CSS: gradientes/bordes, sin animación) ---------- */
+  .card.xp-window{
+    padding: 0;
+    overflow: hidden;
+    border-radius: 8px 8px 4px 4px;
+    border: 1px solid #08388f;
+    box-shadow: 0 10px 22px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.22);
+  }
+  /* Ventanas "dispersas": leve giro y desfase por ventana, sin superponerlas
+     ni sacarlas del flujo normal — mantiene el uso táctil intacto en celular. */
+  .xp-scatter-1{ transform: rotate(-1.3deg); margin: 0 0 22px -4px; width: calc(100% + 4px); }
+  .xp-scatter-2{ transform: rotate(1deg); margin: 0 0 14px 8px; width: calc(100% - 8px); }
+  .xp-scatter-3{ transform: rotate(-0.9deg); margin: 0 0 20px 2px; width: calc(100% - 4px); }
+  .xp-scatter-4{ transform: rotate(1.3deg); margin: 0 0 16px -6px; width: calc(100% + 6px); }
+  .xp-titlebar{
+    display: flex; align-items: center; justify-content: space-between;
+    height: 26px; padding: 0 4px 0 8px;
+    background: linear-gradient(180deg, #3E8EF7 0%, #0A46C2 100%);
+    border-bottom: 1px solid #08388f;
+  }
+  .xp-title{
+    font-family: var(--font-body); font-size: 11px; font-weight: 700;
+    color: #fff; text-shadow: 1px 1px 1px rgba(0,0,0,.4);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .xp-buttons{ display: flex; gap: 3px; flex: 0 0 auto; }
+  .xp-btn{
+    width: 19px; height: 18px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; line-height: 1;
+    border: 1px solid rgba(0,0,0,.35);
+    text-shadow: 0 1px 1px rgba(0,0,0,.4);
+  }
+  .xp-btn-min, .xp-btn-max{ background: linear-gradient(180deg, #6DA8F5, #2C6BD1); }
+  .xp-btn-close{ background: linear-gradient(180deg, #F1948A, #E81123); }
+  .xp-content{ padding: 16px 20px 20px; }
+  .log-clear-btn{
+    display: block; text-align: right; margin-bottom: 6px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);
+    text-transform: none; letter-spacing: 0; cursor: pointer;
+  }
+
+  /* ---------- Lenguaje "sistema restringido" ---------- */
+  .classified-stamp{
+    display: inline-block;
+    margin: 10px 4px 18px;
+    padding: 4px 12px;
+    border: 2px solid rgba(255,111,89,.6);
+    outline: 1px solid rgba(255,111,89,.4);
+    outline-offset: 3px;
+    border-radius: 2px;
+    background: rgba(255,111,89,.05);
+    color: rgba(255,111,89,.85);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    transform: rotate(-4deg);
+  }
+  .hazard-stripe{
+    height: 6px;
+    border-radius: 2px;
+    margin: 0 0 16px;
+    background: repeating-linear-gradient(
+      45deg,
+      #e8b64a 0px, #e8b64a 10px,
+      #10131a 10px, #10131a 20px
+    );
+  }
+  .card--restricted{
+    position: relative;
+    background-image:
+      linear-gradient(var(--amber), var(--amber)), linear-gradient(var(--amber), var(--amber)),
+      linear-gradient(var(--amber), var(--amber)), linear-gradient(var(--amber), var(--amber)),
+      linear-gradient(var(--amber), var(--amber)), linear-gradient(var(--amber), var(--amber)),
+      linear-gradient(var(--amber), var(--amber)), linear-gradient(var(--amber), var(--amber));
+    background-repeat: no-repeat;
+    background-size: 14px 2px, 2px 14px, 14px 2px, 2px 14px, 14px 2px, 2px 14px, 14px 2px, 2px 14px;
+    background-position:
+      -1px -1px, -1px -1px,
+      calc(100% + 1px) -1px, calc(100% + 1px) -1px,
+      -1px calc(100% + 1px), -1px calc(100% + 1px),
+      calc(100% + 1px) calc(100% + 1px), calc(100% + 1px) calc(100% + 1px);
+  }
+  .doc-stamp{
+    position: fixed; bottom: 16px; left: 18px; z-index: 1002; pointer-events: none;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em;
+    text-transform: uppercase; color: #f4f4f4; opacity: .55;
+    text-shadow: 1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000;
+    animation: vhsFlicker 6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .doc-stamp{ animation: none; }
+  }
+
+  .card-title{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-shadow: -1px 0 rgba(255,90,90,.22), 1px 0 rgba(90,190,255,.2);
+  }
+
+  /* ---------- Dial (signature element) ---------- */
+  .dial-holder{ display:flex; justify-content:center; padding: 6px 0 4px; }
+  .dial{ position: relative; width: 176px; height: 176px; }
+  .dial-ticks{ position:absolute; inset:0; }
+  .tick{
+    position:absolute; top:50%; left:50%;
+    width:2px; height:8px; background: var(--border-soft);
+    transform-origin: 50% 88px;
+    margin-left:-1px; margin-top:-88px;
+  }
+  .dial-sweep{
+    position:absolute; inset:14px; border-radius:50%;
+    background: conic-gradient(from 0deg, transparent 0deg, var(--amber) 18deg, transparent 46deg);
+    opacity: 0;
+  }
+  .dial[data-state="scanning"] .dial-sweep{
+    opacity: 1;
+    animation: spin 1.3s linear infinite;
+  }
+  .dial-ring{
+    position:absolute; inset:14px; border-radius:50%;
+    background: var(--panel-alt);
+    border: 2px solid var(--border);
+    transition: border-color .3s ease, box-shadow .3s ease;
+  }
+  .dial[data-state="connected"] .dial-ring{
+    border-color: var(--teal);
+    box-shadow: 0 0 26px rgba(79,214,181,.28), inset 0 0 20px rgba(79,214,181,.08);
+  }
+  .dial[data-state="error"] .dial-ring{
+    border-color: var(--red);
+    box-shadow: 0 0 26px rgba(255,111,89,.25);
+  }
+  .dial-core{
+    position:absolute; inset:14px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap: 3px; padding: 0 12px;
+  }
+  .dial-state{
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-dim);
+  }
+  .dial[data-state="connected"] .dial-state{ color: var(--teal); }
+  .dial[data-state="scanning"] .dial-state{ color: var(--amber); }
+  .dial[data-state="error"] .dial-state{ color: var(--red); }
+  .dial-device{
+    font-family: var(--font-display); font-weight: 600; font-size: 14px;
+    color: var(--text); word-break: break-word;
+  }
+
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce){
+    .dial[data-state="scanning"] .dial-sweep{ animation: none; opacity: .55; }
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn-row{ display:flex; gap:10px; margin-top:16px; }
+  .btn{
+    font-family: var(--font-body); font-weight: 600; font-size: 13.5px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel-alt); color: var(--text);
+    padding: 13px 10px; cursor: pointer; flex: 1;
+    transition: transform .08s ease, border-color .15s ease, background .15s ease;
+  }
+  .btn:active{ transform: scale(0.97); }
+  .btn:focus-visible{ outline: 2px solid var(--amber); outline-offset: 2px; }
+  .btn:disabled{ opacity: .4; cursor: not-allowed; }
+  .btn-primary{ background: linear-gradient(180deg, #e8b64a, #c2933a); border-color: transparent; color: #1a1207; }
+  .btn-primary:active{ background: linear-gradient(180deg, #d9a83f, #ad7f2e); }
+  .btn-ghost{ background: transparent; }
+  .btn-danger{ background: transparent; border-color: rgba(255,111,89,.4); color: var(--red); }
+  .btn-full{ width: 100%; margin-top: 10px; }
+
+  .hint{ font-size: 12px; color: var(--text-faint); margin: 10px 2px 0; line-height:1.5; }
+
+  /* ---------- Mando (3 botones) ---------- */
+  .dpad{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 60px 60px 60px;
+    gap: 8px;
+    max-width: 280px;
+    margin: 6px auto 4px;
+  }
+  .dpad button{
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 20px; font-weight: 600;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel-alt); color: var(--text);
+    cursor: pointer; transition: transform .06s ease, background .12s, border-color .12s;
+    touch-action: none; user-select: none;
+  }
+  .dpad button:active{ transform: scale(0.97); }
+  .dpad button:disabled{ opacity: .35; cursor: not-allowed; }
+  .dpad button.active{
+    background: var(--amber); color: #1a1207; border-color: transparent;
+    box-shadow: 0 0 16px rgba(232,182,74,.4);
+  }
+  .dpad-up{ grid-column: 2; grid-row: 1; }
+  .dpad-left{ grid-column: 1; grid-row: 2; }
+  .dpad-stop{ grid-column: 2; grid-row: 2; color: var(--red); border-color: rgba(255,111,89,.35); font-size: 13px; }
+  .dpad-right{ grid-column: 3; grid-row: 2; }
+  .dpad-down{ grid-column: 2; grid-row: 3; }
+
+  /* ---------- Control por voz ---------- */
+  .voice-config{ margin-bottom: 12px; }
+  .voice-config label{
+    display:block; font-family: var(--font-mono); font-size:11px; letter-spacing:.06em;
+    text-transform:uppercase; color: var(--text-faint); margin-bottom:6px;
+  }
+  .voice-config input{
+    width:100%; background: var(--panel-alt); border:1px solid var(--border);
+    border-radius:10px; padding:11px 14px; color:var(--text);
+    font-family: var(--font-body); font-size:14px;
+  }
+  .voice-config input:focus-visible{ outline:2px solid var(--amber); outline-offset:1px; }
+  #micToggle.active{ background: linear-gradient(180deg, var(--teal), #34a98f); color: #062521; }
+  .voice-status{ display:flex; align-items:center; gap:8px; margin-top:14px; }
+  .mic-dot{
+    width:8px; height:8px; border-radius:50%; flex:0 0 auto;
+    background: var(--text-faint);
+  }
+  .mic-dot.live{
+    background: var(--teal); box-shadow: 0 0 8px var(--teal);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
+  #micStatusText{
+    font-family: var(--font-mono); font-size:11px; letter-spacing:.06em;
+    text-transform: uppercase; color: var(--text-dim);
+  }
+  .voice-transcript{
+    font-family: var(--font-mono); font-size:12.5px; color: var(--text-faint);
+    margin-top:8px; min-height:16px;
+  }
+
+  /* ---------- Manual command ---------- */
+  .cmd-row{ display:flex; gap:8px; margin-top: 4px; }
+  .cmd-row input{
+    flex:1; background: var(--panel-alt); border:1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; color: var(--text);
+    font-family: var(--font-mono); font-size: 14px;
+  }
+  .cmd-row input:focus-visible{ outline: 2px solid var(--amber); outline-offset: 1px; }
+  .cmd-row .btn{ flex: 0 0 auto; padding-left: 18px; padding-right: 18px; }
+
+  /* ---------- Log console: terminal estilo hacker (verde fósforo, siempre oscura) ---------- */
+  .log{
+    background: #060a06; border: 1px solid #123314; border-radius: 10px;
+    padding: 12px 14px; height: 190px; overflow-y: auto; color: #39ff14;
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
+  }
+  .log-line{ white-space: pre-wrap; word-break: break-word; text-shadow: 0 0 3px currentColor, 0 0 7px currentColor; }
+  .log-line.warn{ color: #e8b64a; }
+  .log-line.error{ color: #ff6f59; }
+  .log-line.success{ color: #4fd6b5; }
+  .log-line.tx{ color: #8fb3ff; }
+  .log-line.rx{ color: #4fd6b5; }
+  .log-line.hack{ color: #ff36c8; }
+  .log-line .t{ color: #1f8f2a; text-shadow: none; }
+  .log::-webkit-scrollbar{ width: 6px; }
+  .log::-webkit-scrollbar-thumb{ background: #1d4d21; border-radius: 3px; }
+
+  .term-prompt{
+    display: flex; align-items: center; gap: 6px; margin-top: 8px;
+    font-family: var(--font-mono); font-size: 12px; color: #39ff14;
+    text-shadow: 0 0 3px currentColor, 0 0 7px currentColor;
+  }
+  .term-cursor{
+    display: inline-block; width: 7px; height: 13px;
+    background: #39ff14; box-shadow: 0 0 4px #39ff14, 0 0 8px #39ff14;
+    animation: cursorBlink 1s steps(1) infinite;
+  }
+  @keyframes cursorBlink{ 0%, 49%{ opacity: 1; } 50%, 100%{ opacity: 0; } }
+  @media (prefers-reduced-motion: reduce){
+    .term-cursor{ animation: none; }
+  }
+
+  .unsupported{
+    display:none; background: rgba(255,111,89,.1); border:1px solid rgba(255,111,89,.35);
+    color: #ffcabd; border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-bottom: 16px;
+    line-height: 1.5;
+  }
+  .unsupported.show{ display:block; }
+  [data-theme="light"] .unsupported{
+    background: rgba(217,74,52,.08); border-color: rgba(217,74,52,.35); color: var(--red);
+  }
+
+  footer{ color: var(--text-faint); font-size: 11.5px; line-height: 1.6; text-align:center; margin-top: 8px; }
+  footer a{ color: var(--text-dim); }
+
+  [data-theme="light"] .card{ box-shadow: 0 1px 3px rgba(22,40,63,.06), 0 6px 16px rgba(22,40,63,.04); }
+
+  /* ---------- Efecto VHS (sutil, decorativo, no bloquea clics) ---------- */
+  .vhs-overlay{
+    position: fixed; inset: 0; z-index: 999; pointer-events: none;
+    animation: vhsFlicker 6s ease-in-out infinite;
+  }
+  .vhs-overlay::before{
+    /* líneas de escaneo */
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg, rgba(0,0,0,.05) 0px, rgba(0,0,0,.05) 1px,
+      transparent 1px, transparent 3px
+    );
+  }
+  .vhs-overlay::after{
+    /* viñeta */
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.11) 100%);
+  }
+  @keyframes vhsFlicker{
+    0%, 19%, 21%, 45%, 47%, 100%{ opacity: 1; }
+    20%{ opacity: .88; }
+    46%{ opacity: .93; }
+    73%{ opacity: .9; }
+    74%{ opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .vhs-overlay{ animation: none; }
+  }
+
+  /* ---------- Ruido de cinta (grano animado + franja de tracking abajo) ---------- */
+  .vhs-noise{
+    position: fixed; inset: -20px; z-index: 998; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 140px 140px;
+    filter: contrast(1.3);
+    opacity: .18;
+    mix-blend-mode: screen;
+    animation: grainMove .45s steps(6) infinite;
+  }
+  @keyframes grainMove{
+    0%{ transform: translate(0,0); }
+    16%{ transform: translate(-3%,2%); }
+    33%{ transform: translate(2%,-4%); }
+    50%{ transform: translate(-4%,-2%); }
+    66%{ transform: translate(3%,3%); }
+    83%{ transform: translate(-2%,4%); }
+    100%{ transform: translate(0,0); }
+  }
+  .vhs-tracking{
+    position: fixed; left: 0; right: 0; bottom: 0; height: 11px;
+    z-index: 1001; pointer-events: none; overflow: hidden; opacity: .5;
+  }
+  .vhs-tracking::before{
+    content: ""; position: absolute; inset: -12px 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 90px 90px;
+    filter: contrast(1.6) brightness(1.35);
+    mix-blend-mode: screen;
+    animation: grainMove .35s steps(6) infinite;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .vhs-noise{ animation: none; }
+    .vhs-tracking::before{ animation: none; }
+  }
+  [data-theme="light"] .vhs-noise{
+    mix-blend-mode: multiply;
+    opacity: .12;
+  }
+  [data-theme="light"] .vhs-tracking{ opacity: .4; }
+  [data-theme="light"] .vhs-tracking::before{
+    mix-blend-mode: multiply;
+    filter: contrast(1.5) brightness(.8);
+  }
+
+  /* ---------- Indicador PLAY estilo VCR ---------- */
+  .vcr-play{
+    position: fixed; top: 16px; left: 18px; z-index: 1002; pointer-events: none;
+    font-family: 'VT323', monospace;
+    font-size: 24px;
+    letter-spacing: .06em;
+    color: #f4f4f4;
+    opacity: 1;
+    text-shadow:
+      1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000,
+      1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000,
+      0 2px 4px rgba(0,0,0,.5);
+    animation: vcrBlink 4s linear infinite;
+  }
+  @keyframes vcrBlink{
+    0%, 49.9%{ opacity: 1; }
+    50%, 99.9%{ opacity: 0; }
+    100%{ opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .vcr-play{ animation: none; opacity: 1; }
+  }
+
+  /* ---------- Glitch (breve e irregular, más notorio que el VHS de fondo) ---------- */
+  .glitch-layer{ position: fixed; inset: 0; z-index: 1000; pointer-events: none; }
+  .glitch-layer::before,
+  .glitch-layer::after{
+    content: ""; position: absolute; left: 0; width: 100%; height: 6px;
+    opacity: 0; mix-blend-mode: screen;
+  }
+  .glitch-layer::before{ background: rgba(255,90,90,.55); animation: glitchSliceA 9s steps(1) infinite; }
+  .glitch-layer::after{ background: rgba(90,190,255,.5); animation: glitchSliceB 9s steps(1) infinite; }
+
+  @keyframes glitchJitter{
+    0%, 19.4%, 20.3%, 47.4%, 48.3%, 73.4%, 74.3%, 100%{
+      transform: translateX(0) skewX(0deg) scaleX(1) scaleY(1);
+    }
+    20%{ transform: translateX(0) skewX(3deg) scaleX(1) scaleY(1.015); }
+    48%{ transform: translateX(-3px) skewX(0deg) scaleX(1) scaleY(1); }
+    74%{ transform: translateX(2px) skewX(0deg) scaleX(1.025) scaleY(1); }
+  }
+  @keyframes glitchSliceA{
+    0%, 19.4%, 20.3%, 47.4%, 48.3%, 73.4%, 74.3%, 100%{ opacity: 0; }
+    20%{ opacity: .6; top: 22%; transform: translateX(-12px); }
+    48%{ opacity: .8; top: 34%; transform: translateX(-10px); }
+    74%{ opacity: .55; top: 66%; transform: translateX(9px); }
+  }
+  @keyframes glitchSliceB{
+    0%, 19.4%, 20.3%, 47.4%, 48.3%, 73.4%, 74.3%, 100%{ opacity: 0; }
+    20%{ opacity: .5; top: 44%; transform: translateX(9px); }
+    48%{ opacity: .65; top: 61%; transform: translateX(8px); }
+    74%{ opacity: .45; top: 15%; transform: translateX(-7px); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .wrap{ animation: none; }
+    .glitch-layer::before, .glitch-layer::after{ animation: none; }
+  }
+
+  /* ---------- Ruido de tracking (parches dispersos, ya no bandas completas) ---------- */
+  .tracking-glitch{ position: fixed; inset: 0; z-index: 1001; pointer-events: none; overflow: hidden; }
+  .glitch-patch{
+    position: absolute;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='70'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.008 0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: screen;
+    filter: contrast(1.6) brightness(1.4);
+    will-change: transform;
+  }
+  [data-theme="light"] .glitch-patch{
+    mix-blend-mode: multiply;
+    filter: contrast(1.7) brightness(.75);
+  }
+  .glitch-patch.p1{
+    top: 10%; left: 6%; width: 30%; height: 9%; background-size: 220px 70px; opacity: .5;
+    animation: patchDrift1 12s ease-in-out infinite,
+      trackFlickerA 2.8s ease-in-out infinite, trackScrollA .35s steps(6) infinite;
+  }
+  .glitch-patch.p2{
+    top: 58%; left: 60%; width: 24%; height: 7%; background-size: 180px 55px; opacity: .45;
+    animation: patchDrift2 14.5s ease-in-out infinite,
+      trackFlickerB 3.3s ease-in-out infinite, trackScrollB .3s steps(5) infinite;
+  }
+  .glitch-patch.p3{
+    top: 30%; left: 68%; width: 20%; height: 8%; background-size: 200px 60px; opacity: .4;
+    animation: patchDrift3 16s ease-in-out infinite,
+      trackFlickerB 3.6s ease-in-out infinite, trackScrollA .4s steps(6) infinite;
+  }
+  .glitch-patch.p4{
+    top: 78%; left: 12%; width: 27%; height: 8%; background-size: 190px 65px; opacity: .42;
+    animation: patchDrift4 9.5s ease-in-out infinite,
+      trackFlickerA 3.1s ease-in-out infinite, trackScrollB .32s steps(5) infinite;
+  }
+  /* Deriva + temblor fusionados en un solo transform (compositor GPU,
+     no dispara layout como antes hacían top/left). */
+  @keyframes patchDrift1{
+    0%{ transform: translate(0,0); }
+    12%{ transform: translate(-5px,3px); }
+    25%{ transform: translate(70px,60px); }
+    37%{ transform: translate(66px,64px); }
+    50%{ transform: translate(125px,-15px); }
+    62%{ transform: translate(120px,-10px); }
+    75%{ transform: translate(40px,75px); }
+    87%{ transform: translate(45px,70px); }
+    100%{ transform: translate(0,0); }
+  }
+  @keyframes patchDrift2{
+    0%{ transform: translate(0,0); }
+    15%{ transform: translate(4px,-3px); }
+    30%{ transform: translate(47px,-76px); }
+    45%{ transform: translate(43px,-72px); }
+    60%{ transform: translate(23px,46px); }
+    75%{ transform: translate(28px,42px); }
+    100%{ transform: translate(0,0); }
+  }
+  @keyframes patchDrift3{
+    0%{ transform: translate(0,0); }
+    17%{ transform: translate(-5px,4px); }
+    35%{ transform: translate(-62px,76px); }
+    52%{ transform: translate(-58px,72px); }
+    70%{ transform: translate(39px,-46px); }
+    85%{ transform: translate(35px,-42px); }
+    100%{ transform: translate(0,0); }
+  }
+  @keyframes patchDrift4{
+    0%{ transform: translate(0,0); }
+    20%{ transform: translate(5px,-4px); }
+    40%{ transform: translate(70px,-76px); }
+    60%{ transform: translate(66px,-72px); }
+    80%{ transform: translate(-23px,46px); }
+    90%{ transform: translate(-20px,42px); }
+    100%{ transform: translate(0,0); }
+  }
+  @keyframes trackFlickerA{ 0%, 100%{ opacity: .3; } 50%{ opacity: .68; } }
+  @keyframes trackScrollA{ 0%{ background-position: 0 0; } 100%{ background-position: -220px 0; } }
+
+  @keyframes trackFlickerB{ 0%, 100%{ opacity: .26; } 50%{ opacity: .55; } }
+  @keyframes trackScrollB{ 0%{ background-position: 0 0; } 100%{ background-position: 180px 0; } }
+
+  @media (prefers-reduced-motion: reduce){
+    .glitch-patch{ animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="vhs-overlay" aria-hidden="true"></div>
+<div class="vhs-noise" aria-hidden="true"></div>
+<div class="glitch-layer" aria-hidden="true"></div>
+<div class="vhs-tracking" aria-hidden="true"></div>
+<div class="vcr-play" aria-hidden="true">PLAY ▶</div>
+<div class="doc-stamp" aria-hidden="true">EXP. N.° 0451-B · NO AUTORIZADO</div>
+<div class="tracking-glitch" aria-hidden="true">
+  <span class="glitch-patch p1"></span>
+  <span class="glitch-patch p2"></span>
+  <span class="glitch-patch p3"></span>
+  <span class="glitch-patch p4"></span>
+</div>
+<div class="wrap">
+
+  <div class="brand-bar"></div>
+  <div class="header-row">
+    <div>
+      <div class="eyebrow">Panel de enlace BLE</div>
+      <h1>HM-10 · Control de Vehículo</h1>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="soundToggle" aria-label="Activar sonido de cinta">🔇</button>
+      <div class="settings-wrap">
+        <button class="icon-btn" id="settingsToggle" aria-label="Ajustes de sonido">⚙️</button>
+        <div class="settings-panel" id="settingsPanel" hidden>
+          <label for="hissSlider">Ruido rosa <span id="hissValueLabel">3%</span></label>
+          <input type="range" id="hissSlider" min="0" max="15" step="0.5" value="3">
+          <label for="droneSlider">Motosierra <span id="droneValueLabel">2%</span></label>
+          <input type="range" id="droneSlider" min="0" max="15" step="0.5" value="2">
+        </div>
+      </div>
+      <button class="icon-btn" id="themeToggle" aria-label="Cambiar a modo claro">🌙</button>
+    </div>
+  </div>
+  <p class="sub">Detecta, conecta y prueba tu módulo Bluetooth HM-10 antes de programar el resto del proyecto. Requiere Chrome/Edge en Android.</p>
+
+  <div class="classified-stamp">Acceso restringido</div>
+  <div class="hazard-stripe" aria-hidden="true"></div>
+
+  <div class="unsupported" id="unsupported">
+    Este navegador no soporta Web Bluetooth. Abre esta página en <strong>Chrome</strong>, <strong>Edge</strong> u <strong>Opera</strong> en Android. Safari/Firefox no son compatibles.
+  </div>
+
+  <!-- Estado de conexión -->
+  <section class="card card--restricted xp-window xp-scatter-1">
+    <div class="xp-titlebar">
+      <span class="xp-title">hm10_scanner.exe</span>
+      <span class="xp-buttons" aria-hidden="true">
+        <span class="xp-btn xp-btn-min">_</span>
+        <span class="xp-btn xp-btn-max">□</span>
+        <span class="xp-btn xp-btn-close">×</span>
+      </span>
+    </div>
+    <div class="xp-content">
+    <div class="dial-holder">
+      <div class="dial" id="dial" data-state="idle">
+        <div class="dial-ticks" id="dialTicks"></div>
+        <div class="dial-sweep"></div>
+        <div class="dial-ring"></div>
+        <div class="dial-core">
+          <span class="dial-state" id="dialState">Desconectado</span>
+          <span class="dial-device" id="dialDevice">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnScan">Buscar HM-10</button>
+      <button class="btn btn-ghost" id="btnScanAll">Modo compatibilidad</button>
+    </div>
+    <button class="btn btn-danger btn-full" id="btnDisconnect" disabled>Desconectar</button>
+    <p class="hint">Si "Buscar HM-10" no encuentra nada, usa <strong>Modo compatibilidad</strong>: muchos clones del HM-10 no anuncian su servicio y solo aparecen listando todos los dispositivos cercanos.</p>
+    </div>
+  </section>
+
+  <!-- Mando -->
+  <section class="card xp-window xp-scatter-2">
+    <div class="xp-titlebar">
+      <span class="xp-title">control_remoto.exe</span>
+      <span class="xp-buttons" aria-hidden="true">
+        <span class="xp-btn xp-btn-min">_</span>
+        <span class="xp-btn xp-btn-max">□</span>
+        <span class="xp-btn xp-btn-close">×</span>
+      </span>
+    </div>
+    <div class="xp-content">
+    <div class="dpad">
+      <button class="dpad-up" data-cmd="F" disabled>▲</button>
+      <button class="dpad-left" data-cmd="L" disabled>◀</button>
+      <button class="dpad-stop" data-cmd="S" disabled>■</button>
+      <button class="dpad-right" data-cmd="R" disabled>▶</button>
+      <button class="dpad-down" data-cmd="B" disabled>▼</button>
+    </div>
+    <p class="hint">Envía un solo carácter por comando (F/B/L/R/S). Ajusta <code>CMDS</code> en el código si tu firmware de Arduino usa otra convención.</p>
+    </div>
+  </section>
+
+  <!-- Control por voz -->
+  <section class="card xp-window xp-scatter-3">
+    <div class="xp-titlebar">
+      <span class="xp-title">reconocimiento_voz.exe</span>
+      <span class="xp-buttons" aria-hidden="true">
+        <span class="xp-btn xp-btn-min">_</span>
+        <span class="xp-btn xp-btn-max">□</span>
+        <span class="xp-btn xp-btn-close">×</span>
+      </span>
+    </div>
+    <div class="xp-content">
+    <div class="voice-config">
+      <label for="wakeWordInput">Palabra clave (opcional)</label>
+      <input type="text" id="wakeWordInput" value="coche" autocomplete="off">
+    </div>
+    <button class="btn btn-primary btn-full" id="micToggle" disabled>🎤 Activar micrófono</button>
+    <div class="voice-status">
+      <span class="mic-dot" id="micDot"></span>
+      <span id="micStatusText">Desactivado</span>
+    </div>
+    <div class="voice-transcript" id="micTranscript">—</div>
+    <p class="hint">Di la palabra clave junto con la palabra: <strong>"coche adelante"</strong>, <strong>"coche atrás"</strong>, <strong>"coche izquierda"</strong>, <strong>"coche derecha"</strong>, <strong>"coche detente"</strong>. Deja el campo vacío para aceptar la palabra sola, sin palabra clave.</p>
+    </div>
+  </section>
+
+  <!-- Comando manual -->
+  <section class="card">
+    <p class="card-title">Comando manual</p>
+    <div class="cmd-row">
+      <input type="text" id="cmdInput" placeholder="p. ej. F" disabled>
+      <button class="btn btn-primary" id="btnSend" disabled>Enviar</button>
+    </div>
+  </section>
+
+  <!-- Registro -->
+  <section class="card xp-window xp-scatter-4">
+    <div class="xp-titlebar">
+      <span class="xp-title">system_log.exe</span>
+      <span class="xp-buttons" aria-hidden="true">
+        <span class="xp-btn xp-btn-min">_</span>
+        <span class="xp-btn xp-btn-max">□</span>
+        <span class="xp-btn xp-btn-close">×</span>
+      </span>
+    </div>
+    <div class="xp-content">
+    <span id="logClear" class="log-clear-btn">limpiar</span>
+    <div class="log" id="log"></div>
+    <div class="term-prompt"><span>root@hm10:~$</span><span class="term-cursor" aria-hidden="true"></span></div>
+    </div>
+  </section>
+
+  <footer>
+    Servicio esperado: <code>0xFFE0</code> · Característica: <code>0xFFE1</code><br>
+    Si tu módulo usa otro UUID, identifícalo con la app <strong>nRF Connect</strong> (Android) o <code>chrome://bluetooth-internals</code>, y ajústalo en el código.<br>
+    Web Bluetooth exige HTTPS o <code>localhost</code> — sirve este archivo desde GitHub Pages / Firebase Hosting, no como <code>file://</code>.
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---- Configuración: ajusta esto según tu módulo / firmware ----
+  const HM10_SERVICE = 0xffe0;
+  const HM10_CHARACTERISTIC = 0xffe1;
+  const CMDS = { F: 'F', B: 'B', L: 'L', R: 'R', S: 'S' }; // adelante, atrás, izq, der, alto
+
+  // ---- Referencias UI ----
+  const dial = document.getElementById('dial');
+  const dialState = document.getElementById('dialState');
+  const dialDevice = document.getElementById('dialDevice');
+  const btnScan = document.getElementById('btnScan');
+  const btnScanAll = document.getElementById('btnScanAll');
+  const btnDisconnect = document.getElementById('btnDisconnect');
+  const cmdInput = document.getElementById('cmdInput');
+  const btnSend = document.getElementById('btnSend');
+  const logEl = document.getElementById('log');
+  const dpadButtons = document.querySelectorAll('.dpad button');
+  const micToggle = document.getElementById('micToggle');
+  const wakeWordInput = document.getElementById('wakeWordInput');
+  const micDot = document.getElementById('micDot');
+  const micStatusText = document.getElementById('micStatusText');
+  const micTranscript = document.getElementById('micTranscript');
+  const unsupportedBanner = document.getElementById('unsupported');
+
+  // ---- Estado BLE ----
+  let device = null;
+  let txCharacteristic = null;
+  let rxCharacteristic = null;
+
+  // ---- Ticks del dial (detalle instrumental) ----
+  (function buildTicks(){
+    const holder = document.getElementById('dialTicks');
+    for(let i=0; i<24; i++){
+      const t = document.createElement('div');
+      t.className = 'tick';
+      t.style.transform = 'rotate(' + (i * 15) + 'deg)';
+      holder.appendChild(t);
+    }
+  })();
+
+  // ---- Utilidades ----
+  function log(msg, type){
+    const line = document.createElement('div');
+    line.className = 'log-line' + (type ? ' ' + type : '');
+    const time = new Date().toLocaleTimeString('es-MX', { hour12:false });
+    line.innerHTML = '<span class="t">' + time + '</span>  ' + msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+    while(logEl.children.length > 250){ logEl.removeChild(logEl.firstChild); }
+  }
+
+  document.getElementById('logClear').addEventListener('click', () => { logEl.innerHTML = ''; });
+
+  // ---- Mensajes decorativos tipo "hackeo" (solo ambiente, no son diagnóstico real) ----
+  const HACK_MESSAGES = [
+    'Acceso restringido',
+    'Acceso desconocido',
+    'Escaneando puertos...',
+    'Conexión interceptada',
+    'Nodo remoto localizado',
+    'Firewall detectado',
+    'Verificando credenciales...',
+    'Cifrado AES comprometido'
+  ];
+  function randomHackLine(){
+    if(Math.random() < 0.35){
+      const codigo = String(Math.floor(Math.random() * 999999)).padStart(6, '0');
+      return 'código: ' + codigo;
+    }
+    return HACK_MESSAGES[Math.floor(Math.random() * HACK_MESSAGES.length)];
+  }
+  function scheduleHackLine(){
+    const delay = 4000 + Math.random() * 5000; // entre 4 y 9 segundos, irregular
+    setTimeout(() => {
+      log('» ' + randomHackLine(), 'hack');
+      scheduleHackLine();
+    }, delay);
+  }
+  scheduleHackLine();
+
+  function setState(state, deviceName){
+    dial.dataset.state = state;
+    const labels = { idle: 'Desconectado', scanning: 'Buscando…', connected: 'Conectado', error: 'Error' };
+    dialState.textContent = labels[state] || state;
+    dialDevice.textContent = deviceName || '—';
+
+    const connected = state === 'connected';
+    btnDisconnect.disabled = !connected;
+    cmdInput.disabled = !connected;
+    btnSend.disabled = !connected;
+    dpadButtons.forEach(b => b.disabled = !connected);
+    micToggle.disabled = !connected;
+    if(!connected && micEnabled){
+      micEnabled = false;
+      if(recognition){ try{ recognition.stop(); }catch(e){} }
+      updateMicUI();
+    }
+
+    const scanning = state === 'scanning';
+    btnScan.disabled = scanning;
+    btnScanAll.disabled = scanning;
+  }
+
+  // ---- Escaneo ----
+  async function scanFiltered(){
+    if(!checkSupport()) return;
+    try{
+      log('Iniciando búsqueda filtrada (servicio 0xFFE0 y prefijos de nombre comunes)…');
+      setState('scanning');
+      const dev = await navigator.bluetooth.requestDevice({
+        filters: [
+          { services: [HM10_SERVICE] },
+          { namePrefix: 'HM' },
+          { namePrefix: 'HC' },
+          { namePrefix: 'MLT' },
+          { namePrefix: 'JDY' },
+          { namePrefix: 'AT-' }
+        ],
+        optionalServices: [HM10_SERVICE]
+      });
+      await handleDeviceSelected(dev);
+    } catch(err){ handleScanError(err); }
+  }
+
+  async function scanCompat(){
+    if(!checkSupport()) return;
+    try{
+      log('Iniciando modo compatibilidad — se listarán todos los dispositivos Bluetooth cercanos…');
+      setState('scanning');
+      const dev = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [HM10_SERVICE]
+      });
+      await handleDeviceSelected(dev);
+    } catch(err){ handleScanError(err); }
+  }
+
+  function handleScanError(err){
+    if(err.name === 'NotFoundError'){
+      log('Búsqueda cancelada o sin coincidencias.', 'warn');
+    } else {
+      log('Error al buscar: ' + err.message, 'error');
+    }
+    setState('idle');
+  }
+
+  function checkSupport(){
+    if(!('bluetooth' in navigator)){
+      unsupportedBanner.classList.add('show');
+      return false;
+    }
+    return true;
+  }
+
+  // ---- Conexión y descubrimiento ----
+  async function handleDeviceSelected(dev){
+    device = dev;
+    log('Dispositivo seleccionado: ' + (dev.name || '(sin nombre)') + '  ·  id ' + dev.id);
+    dev.addEventListener('gattserverdisconnected', onDisconnected);
+    await connectGatt();
+  }
+
+  async function connectGatt(){
+    try{
+      log('Conectando al servidor GATT…');
+      const server = await device.gatt.connect();
+      log('Conectado. Buscando servicio 0xFFE0…');
+
+      let service;
+      try{
+        service = await server.getPrimaryService(HM10_SERVICE);
+        log('Servicio 0xFFE0 encontrado.', 'success');
+      } catch(e){
+        log('No se encontró 0xFFE0 directamente. Listando servicios declarados en optionalServices…', 'warn');
+        const services = await server.getPrimaryServices();
+        log('Servicios accesibles: ' + services.length);
+        service = services[0];
+        if(!service){
+          throw new Error('Sin servicios accesibles con este UUID. Identifica el UUID real con nRF Connect o chrome://bluetooth-internals y actualiza HM10_SERVICE en el código.');
+        }
+      }
+
+      const chars = await service.getCharacteristics();
+      log('Características encontradas: ' + chars.length);
+      chars.forEach(c => {
+        const p = c.properties;
+        const flags = Object.keys(p).filter(k => p[k]).join(', ');
+        log('  • ' + c.uuid + '  →  [' + flags + ']');
+      });
+
+      txCharacteristic = chars.find(c => c.uuid.includes('ffe1'))
+        || chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+
+      rxCharacteristic = chars.find(c => c.uuid.includes('ffe1'))
+        || chars.find(c => c.properties.notify || c.properties.indicate);
+
+      if(rxCharacteristic && (rxCharacteristic.properties.notify || rxCharacteristic.properties.indicate)){
+        await rxCharacteristic.startNotifications();
+        rxCharacteristic.addEventListener('characteristicvaluechanged', onDataReceived);
+        log('Notificaciones activas — escuchando datos entrantes.');
+      }
+
+      if(!txCharacteristic){
+        log('No se encontró una característica de escritura. El envío de comandos no estará disponible.', 'warn');
+      }
+
+      setState('connected', device.name);
+      log('Conexión lista.', 'success');
+    } catch(err){
+      log('Error al conectar: ' + err.message, 'error');
+      setState('error');
+    }
+  }
+
+  function onDisconnected(){
+    log('El dispositivo se desconectó.', 'warn');
+    setState('idle');
+    txCharacteristic = null;
+    rxCharacteristic = null;
+  }
+
+  function onDataReceived(e){
+    const text = new TextDecoder().decode(e.target.value);
+    log('« recibido: ' + text, 'rx');
+  }
+
+  // ---- Envío de comandos ----
+  async function sendRaw(text){
+    if(!txCharacteristic){
+      log('No hay característica de escritura disponible.', 'error');
+      return;
+    }
+    const data = new TextEncoder().encode(text);
+    const CHUNK = 18; // margen bajo el MTU típico de 20 bytes
+    try{
+      for(let i = 0; i < data.length; i += CHUNK){
+        const slice = data.slice(i, i + CHUNK);
+        if(txCharacteristic.properties.writeWithoutResponse){
+          await txCharacteristic.writeValueWithoutResponse(slice);
+        } else {
+          await txCharacteristic.writeValue(slice);
+        }
+      }
+      log('» enviado: ' + text, 'tx');
+    } catch(err){
+      log('Error al enviar: ' + err.message, 'error');
+    }
+  }
+
+  function disconnect(){
+    if(device && device.gatt.connected){ device.gatt.disconnect(); }
+  }
+
+  // ---- Eventos UI ----
+  btnScan.addEventListener('click', scanFiltered);
+  btnScanAll.addEventListener('click', scanCompat);
+  btnDisconnect.addEventListener('click', disconnect);
+  btnSend.addEventListener('click', () => {
+    const v = cmdInput.value;
+    if(v){ sendRaw(v); cmdInput.value = ''; }
+  });
+  cmdInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ btnSend.click(); }
+  });
+  // ---- Control por voz (Web Speech API) ----
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  let micEnabled = false;
+
+  function setupRecognition(){
+    const r = new SpeechRecognitionAPI();
+    r.lang = 'es-MX';
+    r.continuous = true;
+    r.interimResults = true;
+
+    r.onresult = (e) => {
+      let finalText = '';
+      for(let i = e.resultIndex; i < e.results.length; i++){
+        const res = e.results[i];
+        if(res.isFinal){ finalText += res[0].transcript; }
+        else { micTranscript.textContent = res[0].transcript; }
+      }
+      if(finalText){
+        micTranscript.textContent = finalText;
+        handleVoiceCommand(finalText);
+      }
+    };
+
+    r.onerror = (e) => {
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+        log('Micrófono bloqueado. Habilita el permiso en el navegador.', 'error');
+        micEnabled = false;
+        updateMicUI();
+      } else if(e.error !== 'no-speech'){
+        log('Error de reconocimiento de voz: ' + e.error, 'warn');
+      }
+    };
+
+    r.onend = () => {
+      if(micEnabled){
+        // Chrome corta el reconocimiento tras silencios; se reinicia solo si sigue activo
+        setTimeout(() => { try{ r.start(); }catch(e){} }, 300);
+      }
+    };
+
+    return r;
+  }
+
+  function handleVoiceCommand(text){
+    const t = text.toLowerCase().trim();
+    const wake = wakeWordInput.value.trim().toLowerCase();
+
+    if(wake && !t.includes(wake)){
+      log('🎤 escuchado: "' + t + '" (sin palabra clave "' + wake + '", ignorado)');
+      return;
+    }
+
+    log('🎤 escuchado: "' + t + '"');
+    if(/\badelante\b/.test(t)){
+      sendRaw(CMDS.F);
+      log('Voz → Adelante', 'success');
+    } else if(/\batr[aá]s\b/.test(t)){
+      sendRaw(CMDS.B);
+      log('Voz → Atrás', 'success');
+    } else if(/\bizquierda\b/.test(t)){
+      sendRaw(CMDS.L);
+      log('Voz → Izquierda', 'success');
+    } else if(/\bderecha\b/.test(t)){
+      sendRaw(CMDS.R);
+      log('Voz → Derecha', 'success');
+    } else if(/\bdetente\b/.test(t)){
+      sendRaw(CMDS.S);
+      log('Voz → Stop', 'success');
+    }
+  }
+
+  function updateMicUI(){
+    micToggle.textContent = micEnabled ? '🎤 Detener escucha' : '🎤 Activar micrófono';
+    micToggle.classList.toggle('active', micEnabled);
+    micDot.classList.toggle('live', micEnabled);
+    micStatusText.textContent = micEnabled ? 'Escuchando…' : 'Desactivado';
+    if(!micEnabled){ micTranscript.textContent = '—'; }
+  }
+
+  micToggle.addEventListener('click', () => {
+    if(!SpeechRecognitionAPI){
+      log('Este navegador no soporta reconocimiento de voz. Usa Chrome en Android.', 'error');
+      return;
+    }
+    if(!recognition){ recognition = setupRecognition(); }
+    micEnabled = !micEnabled;
+    updateMicUI();
+    if(micEnabled){
+      try{ recognition.start(); log('Micrófono activado. Di "1", "2" o "0".'); }
+      catch(e){ /* ya estaba iniciado */ }
+    } else {
+      try{ recognition.stop(); }catch(e){}
+      log('Micrófono desactivado.');
+    }
+  });
+
+  const HOLD_CMDS = new Set([CMDS.F, CMDS.B, CMDS.L, CMDS.R]); // botones de movimiento: presionar y mantener
+
+  dpadButtons.forEach(b => {
+    const cmd = CMDS[b.dataset.cmd] || b.dataset.cmd;
+
+    if(HOLD_CMDS.has(cmd)){
+      let pressed = false;
+      const start = (e) => {
+        e.preventDefault();
+        if(b.disabled || pressed) return;
+        pressed = true;
+        b.classList.add('active');
+        sendRaw(cmd);
+      };
+      const stop = () => {
+        if(!pressed) return;
+        pressed = false;
+        b.classList.remove('active');
+        sendRaw(CMDS.S);
+      };
+      b.addEventListener('pointerdown', start);
+      b.addEventListener('pointerup', stop);
+      b.addEventListener('pointerleave', stop);
+      b.addEventListener('pointercancel', stop);
+    } else {
+      // Botón STOP: toque simple, parada inmediata
+      b.addEventListener('click', () => sendRaw(cmd));
+    }
+  });
+
+  // ---- Tema claro / oscuro ----
+  // ---- Sonido de cinta (ruido rosa + drone grave, muy bajo, generado en el navegador) ----
+  const soundToggle = document.getElementById('soundToggle');
+  const HISS_VOLUME = 0.03;   // ruido rosa de fondo — bajo a propósito
+  const DRONE_VOLUME = 0.02;  // drone grave tipo motosierra — todavía más discreto
+  let hissVolume = HISS_VOLUME;
+  let droneVolume = DRONE_VOLUME;
+  let audioCtx = null;
+  let hissGain = null;
+  let droneGain = null;
+  let soundOn = false;
+
+  function createPinkNoiseBuffer(ctx, seconds){
+    const bufferSize = Math.floor(ctx.sampleRate * seconds);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+    for(let i=0;i<bufferSize;i++){
+      const white = Math.random()*2-1;
+      b0 = 0.99886*b0 + white*0.0555179;
+      b1 = 0.99332*b1 + white*0.0750759;
+      b2 = 0.96900*b2 + white*0.1538520;
+      b3 = 0.86650*b3 + white*0.3104856;
+      b4 = 0.55000*b4 + white*0.5329522;
+      b5 = -0.7616*b5 - white*0.0168980;
+      const pink = b0+b1+b2+b3+b4+b5+b6+white*0.5362;
+      b6 = white*0.115926;
+      data[i] = pink*0.11;
+    }
+    return buffer;
+  }
+
+  function rampGainNode(node, target){
+    const now = audioCtx.currentTime;
+    node.gain.cancelScheduledValues(now);
+    node.gain.setValueAtTime(node.gain.value, now);
+    node.gain.linearRampToValueAtTime(target, now + 0.3);
+  }
+
+  function startHiss(){
+    if(!hissGain){
+      const buffer = createPinkNoiseBuffer(audioCtx, 4);
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      hissGain = audioCtx.createGain();
+      hissGain.gain.value = 0;
+      source.connect(hissGain).connect(audioCtx.destination);
+      source.start();
+    }
+    rampGainNode(hissGain, hissVolume);
+  }
+
+  function startDrone(){
+    if(!droneGain){
+      // Oscilador grave tipo "motosierra": diente de sierra, filtrado y con vaivén lento de tono
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 60;
+
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 340;
+      filter.Q.value = 0.7;
+
+      const lfo = audioCtx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.15; // vaivén lento, como motor mal afinado
+      const lfoGain = audioCtx.createGain();
+      lfoGain.gain.value = 3; // profundidad del vaivén en Hz
+
+      droneGain = audioCtx.createGain();
+      droneGain.gain.value = 0;
+
+      lfo.connect(lfoGain).connect(osc.frequency);
+      osc.connect(filter).connect(droneGain).connect(audioCtx.destination);
+      osc.start();
+      lfo.start();
+    }
+    rampGainNode(droneGain, droneVolume);
+  }
+
+  function startTapeSound(){
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
+    startHiss();
+    startDrone();
+  }
+
+  function stopTapeSound(){
+    if(hissGain){ rampGainNode(hissGain, 0); }
+    if(droneGain){ rampGainNode(droneGain, 0); }
+  }
+
+  soundToggle.addEventListener('click', () => {
+    if(!(window.AudioContext || window.webkitAudioContext)){
+      log('Este navegador no soporta Web Audio. No se puede reproducir el sonido de cinta.', 'error');
+      return;
+    }
+    soundOn = !soundOn;
+    if(soundOn){
+      startTapeSound();
+      soundToggle.textContent = '🔊';
+      soundToggle.setAttribute('aria-label', 'Silenciar sonido de cinta');
+    } else {
+      stopTapeSound();
+      soundToggle.textContent = '🔇';
+      soundToggle.setAttribute('aria-label', 'Activar sonido de cinta');
+    }
+  });
+
+  // ---- Panel de ajustes de sonido ----
+  const settingsWrap = document.querySelector('.settings-wrap');
+  const settingsToggle = document.getElementById('settingsToggle');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const hissSlider = document.getElementById('hissSlider');
+  const droneSlider = document.getElementById('droneSlider');
+  const hissValueLabel = document.getElementById('hissValueLabel');
+  const droneValueLabel = document.getElementById('droneValueLabel');
+
+  settingsToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsPanel.hidden = !settingsPanel.hidden;
+  });
+  document.addEventListener('click', (e) => {
+    if(!settingsPanel.hidden && !settingsWrap.contains(e.target)){
+      settingsPanel.hidden = true;
+    }
+  });
+
+  hissSlider.addEventListener('input', () => {
+    hissVolume = hissSlider.value / 100;
+    hissValueLabel.textContent = hissSlider.value + '%';
+    if(hissGain && soundOn){
+      hissGain.gain.setTargetAtTime(hissVolume, audioCtx.currentTime, 0.05);
+    }
+  });
+  droneSlider.addEventListener('input', () => {
+    droneVolume = droneSlider.value / 100;
+    droneValueLabel.textContent = droneSlider.value + '%';
+    if(droneGain && soundOn){
+      droneGain.gain.setTargetAtTime(droneVolume, audioCtx.currentTime, 0.05);
+    }
+  });
+
+  const themeToggle = document.getElementById('themeToggle');
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  themeToggle.addEventListener('click', () => {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if(isLight){
+      document.documentElement.removeAttribute('data-theme');
+      themeToggle.textContent = '🌙';
+      themeToggle.setAttribute('aria-label', 'Cambiar a modo claro');
+      if(metaThemeColor) metaThemeColor.setAttribute('content', '#0b1826');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      themeToggle.textContent = '☀️';
+      themeToggle.setAttribute('aria-label', 'Cambiar a modo oscuro');
+      if(metaThemeColor) metaThemeColor.setAttribute('content', '#eef2f7');
+    }
+  });
+
+  checkSupport();
+  log('Panel listo. Toca "Buscar HM-10" para comenzar.');
+})();
+</script>
+</body>
+</html>
