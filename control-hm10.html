@@ -1081,12 +1081,17 @@
   const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
   let micEnabled = false;
+  let recognitionActive = false; // evita llamar start() cuando ya está corriendo
 
   function setupRecognition(){
     const r = new SpeechRecognitionAPI();
     r.lang = 'es-MX';
     r.continuous = true;
     r.interimResults = true;
+
+    r.onstart = () => {
+      recognitionActive = true;
+    };
 
     r.onresult = (e) => {
       let finalText = '';
@@ -1112,9 +1117,12 @@
     };
 
     r.onend = () => {
+      recognitionActive = false;
       if(micEnabled){
         // Chrome corta el reconocimiento tras silencios; se reinicia solo si sigue activo
+        // y solo si de verdad no quedó una sesión ya corriendo (evita el error "already started").
         setTimeout(() => {
+          if(recognitionActive || !micEnabled) return;
           try{ r.start(); }
           catch(e){ log('No se pudo reanudar el micrófono (' + e.message + ').', 'warn'); }
         }, 300);
@@ -1169,11 +1177,15 @@
     micEnabled = !micEnabled;
     updateMicUI();
     if(micEnabled){
-      try{
-        recognition.start();
-        log('Micrófono activado. Di "coche adelante", "coche atrás", "coche izquierda", "coche derecha" o "coche detente".');
-      } catch(e){
-        log('No se pudo iniciar el micrófono (' + e.message + '). Espera un segundo y vuelve a tocar el botón.', 'error');
+      if(recognitionActive){
+        log('El micrófono ya estaba escuchando.');
+      } else {
+        try{
+          recognition.start();
+          log('Micrófono activado. Di "coche adelante", "coche atrás", "coche izquierda", "coche derecha" o "coche detente".');
+        } catch(e){
+          log('No se pudo iniciar el micrófono (' + e.message + '). Espera un segundo y vuelve a tocar el botón.', 'error');
+        }
       }
     } else {
       try{ recognition.stop(); }catch(e){}
