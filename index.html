@@ -763,7 +763,7 @@
     </div>
     <div class="xp-content">
     <div class="voice-config">
-      <label for="wakeWordInput">Palabra clave (opcional)</label>
+      <label for="wakeWordInput">Nombre del coche (opcional)</label>
       <input type="text" id="wakeWordInput" value="coche" autocomplete="off">
     </div>
     <button class="btn btn-primary btn-full" id="micToggle" disabled>🎤 Activar micrófono</button>
@@ -772,7 +772,7 @@
       <span id="micStatusText">Desactivado</span>
     </div>
     <div class="voice-transcript" id="micTranscript">—</div>
-    <p class="hint">Di la palabra clave junto con la palabra: <strong>"coche adelante"</strong>, <strong>"coche atrás"</strong>, <strong>"coche izquierda"</strong>, <strong>"coche derecha"</strong>, <strong>"coche detente"</strong>. Deja el campo vacío para aceptar la palabra sola, sin palabra clave.</p>
+    <p class="hint">Dile el nombre a tu coche, como con Alexa: <strong>"coche, ve hacia adelante"</strong>, <strong>"coche, retrocede"</strong>, <strong>"coche, gira a la izquierda"</strong>, <strong>"coche, alto"</strong>. No hace falta decirlo exacto — solo que la palabra clave y el comando aparezcan en la frase. Deja el campo vacío para aceptar el comando solo, sin nombre.</p>
     </div>
   </section>
 
@@ -1142,10 +1142,10 @@
     }
 
     log('🎤 escuchado: "' + t + '"');
-    if(/\badelante\b/.test(t)){
+    if(/\b(adelante|avanza|avanzar)\b/.test(t)){
       sendRaw(CMDS.F);
       log('Voz → Adelante', 'success');
-    } else if(/\batr[aá]s\b/.test(t)){
+    } else if(/\b(atr[aá]s|retrocede|reversa)\b/.test(t)){
       sendRaw(CMDS.B);
       log('Voz → Atrás', 'success');
     } else if(/\bizquierda\b/.test(t)){
@@ -1154,7 +1154,7 @@
     } else if(/\bderecha\b/.test(t)){
       sendRaw(CMDS.R);
       log('Voz → Derecha', 'success');
-    } else if(/\bdetente\b/.test(t)){
+    } else if(/\b(detente|alto|det[eé]n)\b/.test(t)){
       sendRaw(CMDS.S);
       log('Voz → Stop', 'success');
     }
