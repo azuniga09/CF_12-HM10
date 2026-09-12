@@ -318,6 +318,7 @@
   .btn-full{ width: 100%; margin-top: 10px; }
 
   .hint{ font-size: 12px; color: var(--text-faint); margin: 10px 2px 0; line-height:1.5; }
+  .visually-hidden{ display: none; }
 
   /* ---------- Mando (3 botones) ---------- */
   .dpad{
@@ -360,6 +361,16 @@
     font-family: var(--font-body); font-size:14px;
   }
   .voice-config input:focus-visible{ outline:2px solid var(--amber); outline-offset:1px; }
+
+  .speed-control{ margin-top: 14px; }
+  .speed-control label{
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-faint); margin-bottom: 6px;
+  }
+  .speed-control input[type="range"]{ width: 100%; accent-color: var(--amber); }
+  .speed-control input[type="range"]:disabled{ opacity: .4; }
+
   #micToggle.active{ background: linear-gradient(180deg, var(--teal), #34a98f); color: #062521; }
   .voice-status{ display:flex; align-items:center; gap:8px; margin-top:14px; }
   .mic-dot{
@@ -748,6 +759,10 @@
       <button class="dpad-down" data-cmd="B" disabled>▼</button>
     </div>
     <p class="hint">Envía un solo carácter por comando (F/B/L/R/S). Ajusta <code>CMDS</code> en el código si tu firmware de Arduino usa otra convención.</p>
+    <div class="speed-control">
+      <label for="speedSlider">Velocidad <span id="speedValueLabel">100%</span></label>
+      <input type="range" id="speedSlider" min="10" max="100" step="5" value="100" disabled>
+    </div>
     </div>
   </section>
 
@@ -772,7 +787,7 @@
       <span id="micStatusText">Desactivado</span>
     </div>
     <div class="voice-transcript" id="micTranscript">—</div>
-    <p class="hint">Dile el nombre a tu coche, como con Alexa: <strong>"coche, ve hacia adelante"</strong>, <strong>"coche, retrocede"</strong>, <strong>"coche, gira a la izquierda"</strong>, <strong>"coche, alto"</strong>. No hace falta decirlo exacto — solo que la palabra clave y el comando aparezcan en la frase. Deja el campo vacío para aceptar el comando solo, sin nombre.</p>
+    <p class="hint">Dile el nombre a tu coche, como con Alexa: <strong>"coche, ve hacia adelante"</strong>, <strong>"coche, retrocede"</strong>, <strong>"coche, gira a la izquierda"</strong>, <strong>"coche, alto"</strong>, <strong>"coche, velocidad 50"</strong>, <strong>"coche, rápido"</strong>, <strong>"coche, lento"</strong>. No hace falta decirlo exacto — solo que la palabra clave y el comando aparezcan en la frase. Deja el campo vacío para aceptar el comando solo, sin nombre.</p>
     </div>
   </section>
 
@@ -783,6 +798,17 @@
       <input type="text" id="cmdInput" placeholder="p. ej. F" disabled>
       <button class="btn btn-primary" id="btnSend" disabled>Enviar</button>
     </div>
+  </section>
+
+  <!-- Música -->
+  <section class="card">
+    <p class="card-title">Música</p>
+    <input type="file" id="musicFile" class="visually-hidden" accept=".wav,.mp3,.mp4,audio/wav,audio/mpeg,audio/mp4">
+    <button class="btn btn-ghost btn-full" id="musicPick">Elegir archivo (WAV / MP3 / MP4)</button>
+    <p class="hint" id="musicFileName">Ningún archivo seleccionado.</p>
+    <button class="btn btn-primary btn-full" id="musicToggle" disabled>▶️ Reproducir</button>
+    <audio id="audioPlayer" class="visually-hidden"></audio>
+    <p class="hint">Di <strong>"coche, música"</strong> para reproducir o <strong>"coche, pausa"</strong> para pausar. La voz solo puede controlarla <strong>después</strong> de que toques "Reproducir" con el dedo al menos una vez — es una restricción de los navegadores, no del código.</p>
   </section>
 
   <!-- Registro -->
@@ -830,6 +856,14 @@
   const btnSend = document.getElementById('btnSend');
   const logEl = document.getElementById('log');
   const dpadButtons = document.querySelectorAll('.dpad button');
+  const speedSlider = document.getElementById('speedSlider');
+  const speedValueLabel = document.getElementById('speedValueLabel');
+  speedSlider.addEventListener('input', () => {
+    speedValueLabel.textContent = speedSlider.value + '%';
+  });
+  speedSlider.addEventListener('change', () => {
+    sendSpeed(Number(speedSlider.value));
+  });
   const micToggle = document.getElementById('micToggle');
   const wakeWordInput = document.getElementById('wakeWordInput');
   const micDot = document.getElementById('micDot');
@@ -904,6 +938,7 @@
     cmdInput.disabled = !connected;
     btnSend.disabled = !connected;
     dpadButtons.forEach(b => b.disabled = !connected);
+    speedSlider.disabled = !connected;
     micToggle.disabled = !connected;
     if(!connected && micEnabled){
       micEnabled = false;
@@ -1062,6 +1097,80 @@
     }
   }
 
+  // Comando de velocidad: 'V' + 1 byte crudo (0-255) con el valor PWM.
+  // Se manda como Uint8Array directo, NO como texto — TextEncoder usa UTF-8
+  // y codificaría cualquier valor de 128 a 255 en DOS bytes, rompiendo el protocolo.
+  async function sendSpeed(percent){
+    if(!txCharacteristic){
+      log('No hay característica de escritura disponible.', 'error');
+      return;
+    }
+    const pwm = Math.round(percent / 100 * 255);
+    const data = new Uint8Array([0x56, pwm]); // 0x56 = 'V'
+    try{
+      if(txCharacteristic.properties.writeWithoutResponse){
+        await txCharacteristic.writeValueWithoutResponse(data);
+      } else {
+        await txCharacteristic.writeValue(data);
+      }
+      log('» velocidad: ' + percent + '% (PWM ' + pwm + ')', 'tx');
+    } catch(err){
+      log('Error al enviar velocidad: ' + err.message, 'error');
+    }
+  }
+
+  // ---- Reproductor de música (independiente del Bluetooth, solo navegador) ----
+  const musicFileInput = document.getElementById('musicFile');
+  const musicPickBtn = document.getElementById('musicPick');
+  const musicFileName = document.getElementById('musicFileName');
+  const musicToggleBtn = document.getElementById('musicToggle');
+  const audioPlayer = document.getElementById('audioPlayer');
+
+  musicPickBtn.addEventListener('click', () => musicFileInput.click());
+
+  musicFileInput.addEventListener('change', () => {
+    const file = musicFileInput.files[0];
+    if(!file) return;
+    const name = file.name.toLowerCase();
+    const valido = name.endsWith('.wav') || name.endsWith('.mp3') || name.endsWith('.mp4');
+    if(!valido){
+      log('Formato no permitido: "' + file.name + '". Solo se aceptan .wav, .mp3 o .mp4.', 'error');
+      musicFileInput.value = '';
+      return;
+    }
+    if(audioPlayer.src){ URL.revokeObjectURL(audioPlayer.src); }
+    audioPlayer.src = URL.createObjectURL(file);
+    musicFileName.textContent = file.name;
+    musicToggleBtn.disabled = false;
+    musicToggleBtn.textContent = '▶️ Reproducir';
+    log('Música cargada: ' + file.name);
+  });
+
+  function playMusic(){
+    if(!audioPlayer.src){
+      log('Primero elige un archivo de música.', 'warn');
+      return;
+    }
+    audioPlayer.play().then(() => {
+      musicToggleBtn.textContent = '⏸️ Pausar';
+      log('Reproduciendo música.');
+    }).catch(err => {
+      log('No se pudo reproducir (' + err.message + '). Toca "Reproducir" con el dedo al menos una vez.', 'error');
+    });
+  }
+  function pauseMusic(){
+    audioPlayer.pause();
+    musicToggleBtn.textContent = '▶️ Reproducir';
+    log('Música pausada.');
+  }
+
+  musicToggleBtn.addEventListener('click', () => {
+    if(audioPlayer.paused){ playMusic(); } else { pauseMusic(); }
+  });
+  audioPlayer.addEventListener('ended', () => {
+    musicToggleBtn.textContent = '▶️ Reproducir';
+  });
+
   function disconnect(){
     if(device && device.gatt.connected){ device.gatt.disconnect(); }
   }
@@ -1132,6 +1241,22 @@
     return r;
   }
 
+  const NUMBER_WORDS = {
+    diez: 10, veinte: 20, treinta: 30, cuarenta: 40, cincuenta: 50,
+    sesenta: 60, setenta: 70, ochenta: 80, noventa: 90, cien: 100
+  };
+  function extractSpeedFromText(t){
+    const digitMatch = t.match(/velocidad\D{0,10}(\d{1,3})/);
+    if(digitMatch){ return Math.min(100, parseInt(digitMatch[1], 10)); }
+    for(const palabra in NUMBER_WORDS){
+      if(t.includes(palabra)){ return NUMBER_WORDS[palabra]; }
+    }
+    if(/\b(r[aá]pido|m[aá]xima?)\b/.test(t)) return 100;
+    if(/\b(lento|m[ií]nima?)\b/.test(t)) return 30;
+    if(/\b(media|normal)\b/.test(t)) return 60;
+    return null;
+  }
+
   function handleVoiceCommand(text){
     const t = text.toLowerCase().trim();
     const wake = wakeWordInput.value.trim().toLowerCase();
@@ -1142,6 +1267,29 @@
     }
 
     log('🎤 escuchado: "' + t + '"');
+
+    if(/\bvelocidad\b/.test(t) || /\b(r[aá]pido|lento|m[aá]xima?|m[ií]nima?|media|normal)\b/.test(t)){
+      const speed = extractSpeedFromText(t);
+      if(speed !== null){
+        speedSlider.value = speed;
+        speedValueLabel.textContent = speed + '%';
+        sendSpeed(speed);
+        log('Voz → Velocidad ' + speed + '%', 'success');
+        return;
+      }
+    }
+
+    if(/\bpausa\b/.test(t)){
+      pauseMusic();
+      log('Voz → Pausar música', 'success');
+      return;
+    }
+    if(/\b(m[uú]sica|canci[oó]n|play|reproduce)\b/.test(t)){
+      playMusic();
+      log('Voz → Reproducir música', 'success');
+      return;
+    }
+
     if(/\b(adelante|avanza|avanzar)\b/.test(t)){
       sendRaw(CMDS.F);
       log('Voz → Adelante', 'success');
