@@ -1086,7 +1086,7 @@
   function setupRecognition(){
     const r = new SpeechRecognitionAPI();
     r.lang = 'es-MX';
-    r.continuous = true;
+    r.continuous = false; // Android es poco confiable en modo continuo; una frase a la vez funciona mejor
     r.interimResults = true;
 
     r.onstart = () => {
@@ -1119,13 +1119,13 @@
     r.onend = () => {
       recognitionActive = false;
       if(micEnabled){
-        // Chrome corta el reconocimiento tras silencios; se reinicia solo si sigue activo
-        // y solo si de verdad no quedó una sesión ya corriendo (evita el error "already started").
+        // Con continuous=false cada frase termina la sesión — se reinicia enseguida
+        // para que se sienta continuo, solo si de verdad no quedó otra sesión corriendo.
         setTimeout(() => {
           if(recognitionActive || !micEnabled) return;
           try{ r.start(); }
           catch(e){ log('No se pudo reanudar el micrófono (' + e.message + ').', 'warn'); }
-        }, 300);
+        }, 250);
       }
     };
 
